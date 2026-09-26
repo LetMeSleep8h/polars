@@ -316,6 +316,13 @@ pub(crate) fn set_cache_states(
         // rev() the iter to visit/optimize the caches below the current cache before the current cache,
         // otherwise we get `IR::Invalid` as predicate pd `take()`s from the IR arena.
         for (cache_id, v) in cache_schema_and_children.into_iter().rev() {
+            // A cache at the plan root has no parent, so the first traversal never
+            // recorded children, parents or cache nodes for it. There is no pushdown
+            // state to restart for such an entry — the subplan below it is already
+            // optimized — so leave it untouched. See #29541.
+            if v.cache_nodes.is_empty() {
+                continue;
+            }
             pred_pd.streaming = v.streaming;
             // The shared subplan, narrowed and optimized, once the cost check built it.
             let mut shared_input = None;

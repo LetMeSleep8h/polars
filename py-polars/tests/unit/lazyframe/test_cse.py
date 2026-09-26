@@ -16,7 +16,7 @@ from polars.io.plugins import register_io_source
 from polars.testing import assert_frame_equal, assert_frame_not_equal
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from tests.conftest import PlMonkeyPatch
 
@@ -2256,5 +2256,25 @@ def test_cspe_narrowing_ignores_a_reader_that_keeps_no_rows(dead: pl.Expr) -> No
     assert_frame_equal(
         q.collect(),
         q.collect(optimizations=pl.QueryOptFlags(comm_subplan_elim=False)),
+        check_row_order=False,
+    )
+
+
+@pytest.mark.parametrize(
+    "q",
+    [
+        (lambda lf: lf.join(lf, on="a")),
+        (lambda lf: lf.join(lf, on="a").select("a")),
+        (lambda lf: pl.concat([lf, lf])),
+    ],
+)
+def test_root_cache_with_cse_no_panic_29541(q: Callable[[pl.LazyFrame], pl.LazyFrame]) -> None:
+    lf = pl.LazyFrame({"a": [1, 2]})
+    # A `.cache()` at the root of the plan, above a subplan that CSE unifies,
+    # must collect to the same result as the uncached query.
+    expected = q(lf).collect(optimizations=pl.QueryOptFlags(comm_subplan_elim=False))
+    assert_frame_equal(
+        q(lf).cache().collect(),
+        expected,
         check_row_order=False,
     )
