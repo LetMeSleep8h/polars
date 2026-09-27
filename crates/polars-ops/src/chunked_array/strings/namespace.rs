@@ -48,7 +48,10 @@ where
             polars_bail!(ComputeError: "`to_integer` called with invalid base '{base}'");
         }
 
-        Ok(T::Native::from_str_radix(s, base).ok())
+        // Python's `int()` (and pandas' `to_numeric`) accept leading and trailing
+        // whitespace around the digits; `num_traits::from_str_radix` does not. Trim
+        // so the same string parses the same way across the three (#29571).
+        Ok(T::Native::from_str_radix(s.trim(), base).ok())
     };
     let out: ChunkedArray<T> = broadcast_try_binary_elementwise(ca, base, f)?;
     if strict && ca.null_count() != out.null_count() {

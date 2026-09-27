@@ -476,6 +476,14 @@ def test_str_to_integer() -> None:
         hex.str.to_integer(base=16)
 
 
+def test_str_to_integer_accepts_surrounding_whitespace() -> None:
+    # GH #29571: Python's int() (and pandas' to_numeric) accept leading/trailing
+    # whitespace; to_integer rejected it as a parse failure.
+    s = pl.Series([" 1", "1 ", "+1", "  1  "])
+    assert s.str.to_integer(strict=False).to_list() == [1, 1, 1, 1]
+    assert s.str.to_integer().to_list() == [1, 1, 1, 1]
+
+
 @pytest.mark.parametrize("strict", [False, True])
 def test_str_to_integer_invalid_base(strict: bool) -> None:
     numbers = pl.Series(["1", "ZZZ", "-ABCZZZ", None])
